@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loan Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --text: #1d2433;
+    --muted: #6b7385;
+    --line: #e3e7ee;
+    --brand: #1f7a5c;
+    --brand-dark: #165c45;
+    --brand-soft: #e6f4ee;
+    --warn: #b45309;
+    --warn-soft: #fef3e2;
+    --danger: #c0392b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+  }
+  header {
+    background: var(--brand);
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: .3px; }
+  header .user { font-size: 13px; opacity: .9; display: flex; align-items: center; gap: 10px; }
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 40px; }
+  .hidden { display: none !important; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+  .narrow { max-width: 400px; margin: 40px auto; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    background: #fff;
+  }
+  input:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+  .field { margin-bottom: 14px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  button {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary:hover { background: var(--brand-dark); }
+  .btn-light { background: #fff; color: var(--text); border: 1px solid var(--line); }
+  .btn-light:hover { background: #f0f2f5; }
+  .btn-ghost { background: rgba(255,255,255,.15); color: #fff; padding: 6px 12px; }
+  .btn-small { padding: 5px 10px; font-size: 12px; }
+  .btn-danger { background: #fff; color: var(--danger); border: 1px solid #f1c9c4; }
+  button:disabled { opacity: .6; cursor: wait; }
+  .msg { font-size: 13px; margin-top: 10px; min-height: 18px; }
+  .msg.error { color: var(--danger); }
+  .msg.ok { color: var(--brand); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .stat .value { font-size: 23px; font-weight: 700; margin-top: 6px; }
+  .stat .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .stat.green .value { color: var(--brand); }
+  .progress-wrap { background: #e9edf2; border-radius: 99px; height: 14px; overflow: hidden; }
+  .progress-bar { background: var(--brand); height: 100%; width: 0; transition: width .6s; }
+  .progress-info { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; gap: 6px; }
+  .banner {
+    background: var(--warn-soft);
+    color: var(--warn);
+    border: 1px solid #f5d9ae;
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 18px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .banner.done { background: var(--brand-soft); color: var(--brand); border-color: #bfe3d3; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  td.num, th.num { text-align: right; }
+  td.notes { white-space: normal; min-width: 140px; color: var(--muted); }
+  td.actions { text-align: right; }
+  td.actions button { margin-left: 6px; }
+  .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .card-head h2 { margin: 0; }
+  .form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .loading { text-align: center; color: var(--muted); padding: 60px 0; }
+  .loan-name { font-size: 13px; color: var(--muted); margin: -6px 0 16px; }
+  .loan-name a { color: var(--brand); cursor: pointer; text-decoration: underline; margin-left: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Loan Tracker</h1>
+  <div class="user hidden" id="userBox">
+    <span id="userEmail"></span>
+    <button class="btn-ghost btn-small" id="logoutBtn">Log out</button>
+  </div>
+</header>
+
+<main>
+  <div class="loading" id="loadingView">Loading...</div>
+
+  <!-- LOGIN -->
+  <div class="card narrow hidden" id="loginView">
+    <h2>Sign in</h2>
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-primary" id="loginBtn">Sign in</button>
+      <div class="msg error" id="loginMsg"></div>
+    </form>
+  </div>
+
+  <!-- LOAN SETUP / EDIT -->
+  <div class="card narrow hidden" id="setupView">
+    <h2 id="setupTitle">Set up your loan</h2>
+    <form id="setupForm">
+      <div class="field">
+        <label for="loanName">Loan name</label>
+        <input type="text" id="loanName" required value="Home Loan">
+      </div>
+      <div class="field">
+        <label for="loanTotal">Total amount (₹)</label>
+        <input type="number" id="loanTotal" required min="1" step="1" value="1738000">
+      </div>
+      <div class="field">
+        <label for="loanMonthly">Monthly payment (₹)</label>
+        <input type="number" id="loanMonthly" required min="1" step="1" value="10000">
+      </div>
+      <div class="field">
+        <label for="loanStart">Start date</label>
+        <input type="date" id="loanStart" required value="2026-05-01">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn-primary" id="setupBtn">Save loan</button>
+        <button type="button" class="btn-light hidden" id="setupCancel">Cancel</button>
+      </div>
+      <div class="msg error" id="setupMsg"></div>
+    </form>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="hidden" id="appView">
+    <div class="loan-name"><span id="loanTitle"></span><a id="editLoanLink">Edit loan</a></div>
+
+    <div class="banner hidden" id="reminder"></div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Total loan</div>
+        <div class="value" id="statTotal">₹0</div>
+        <div class="sub" id="statMonthly"></div>
+      </div>
+      <div class="stat green">
+        <div class="label">Paid so far</div>
+        <div class="value" id="statPaid">₹0</div>
+        <div class="sub" id="statCount"></div>
+      </div>
+      <div class="stat">
+        <div class="label">Remaining</div>
+        <div class="value" id="statRemaining">₹0</div>
+        <div class="sub" id="statMonthsLeft"></div>
+      </div>
+      <div class="stat">
+        <div class="label">Expected completion</div>
+        <div class="value" id="statFinish">-</div>
+        <div class="sub" id="statFinishSub"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Progress</h2>
+      <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="progress-info">
+        <span id="progressPct">0% complete</span>
+        <span id="progressPayments"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="formTitle">Add payment</h2>
+      <form id="payForm">
+        <div class="row">
+          <div class="field">
+            <label for="payDate">Payment date</label>
+            <input type="date" id="payDate" required>
+          </div>
+          <div class="field">
+            <label for="payAmount">Amount (₹)</label>
+            <input type="number" id="payAmount" required min="1" step="1">
+          </div>
+          <div class="field">
+            <label for="payNotes">Notes</label>
+            <input type="text" id="payNotes" placeholder="Optional">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" id="payBtn">Save payment</button>
+          <button type="button" class="btn-light hidden" id="payCancel">Cancel edit</button>
+        </div>
+        <div class="msg" id="payMsg"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Payment history</h2>
+        <button class="btn-light btn-small hidden" id="importBtn">Import 5 entries from old sheet</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th class="num">Amount</th>
+              <th class="num">Remaining</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  // ---------- Connection ----------
+  const SUPABASE_URL = "https://eqnaapxgwdfxibuzagxs.supabase.co";
+  const SUPABASE_KEY = "sb_publishable__tW9E-hvOX7um60lRaKo3w_zMQ-19db";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // Old Google Sheet entries (one-time import)
+  const OLD_ENTRIES = [
+    { paid_on: "2026-05-07", amount: 10000, notes: "DONE" },
+    { paid_on: "2026-06-08", amount: 10000, notes: "DONE" },
+    { paid_on: "2026-07-08", amount: 10000, notes: "DONE" },
+    { paid_on: "2026-08-07", amount: 10000, notes: "Done" },
+    { paid_on: "2026-09-07", amount: 10000, notes: "paid on 07.09.2026" }
+  ];
+
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  let state = { user: null, loan: null, payments: [], editingId: null };
+
+  // ---------- Helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const rupee = (n) => "₹" + Math.round(Number(n)).toLocaleString("en-IN");
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function fmtDate(s) {
+    const [y, m, d] = s.split("-");
+    return d + "-" + MONTHS[Number(m) - 1] + "-" + y;
+  }
+  // Month index = year*12 + month(0-11), makes month maths easy
+  function monthIndex(s) {
+    const [y, m] = s.split("-").map(Number);
+    return y * 12 + (m - 1);
+  }
+  function idxToLabel(i) {
+    return MONTHS[i % 12] + " " + Math.floor(i / 12);
+  }
+  function yearsMonths(n) {
+    const y = Math.floor(n / 12), m = n % 12;
+    const parts = [];
+    if (y) parts.push(y + (y === 1 ? " year" : " years"));
+    if (m) parts.push(m + (m === 1 ? " month" : " months"));
+    return parts.join(" ") || "0 months";
+  }
+
+  function show(view) {
+    ["loadingView", "loginView", "setupView", "appView"].forEach(v => $(v).classList.add("hidden"));
+    $(view).classList.remove("hidden");
+  }
+  function setMsg(el, text, type) {
+    el.textContent = text || "";
+    el.className = "msg" + (type ? " " + type : "");
+  }
+
+  // ---------- Auth ----------
+  async function init() {
+    const { data } = await sb.auth.getSession();
+    if (data.session) {
+      onSignedIn(data.session.user);
+    } else {
+      show("loginView");
+    }
+  }
+
+  function onSignedIn(user) {
+    state.user = user;
+    $("userEmail").textContent = user.email;
+    $("userBox").classList.remove("hidden");
+    loadData();
+  }
+
+  $("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("loginBtn");
+    btn.disabled = true;
+    setMsg($("loginMsg"), "");
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: $("loginEmail").value.trim(),
+      password: $("loginPassword").value
+    });
+    btn.disabled = false;
+    if (error) {
+      setMsg($("loginMsg"), "Sign in failed: " + error.message, "error");
+      return;
+    }
+    $("loginPassword").value = "";
+    onSignedIn(data.user);
+  });
+
+  $("logoutBtn").addEventListener("click", async () => {
+    await sb.auth.signOut();
+    state = { user: null, loan: null, payments: [], editingId: null };
+    $("userBox").classList.add("hidden");
+    show("loginView");
+  });
+
+  // ---------- Data ----------
+  async function loadData() {
+    show("loadingView");
+    const { data: loans, error } = await sb.from("loans").select("*").order("id").limit(1);
+    if (error) {
+      $("loadingView").textContent = "Could not load data: " + error.message;
+      return;
+    }
+    if (!loans.length) {
+      openSetup(false);
+      return;
+    }
+    state.loan = loans[0];
+    await loadPayments();
+    show("appView");
+  }
+
+  async function loadPayments() {
+    const { data, error } = await sb.from("payments")
+      .select("*")
+      .eq("loan_id", state.loan.id)
+      .order("paid_on", { ascending: true })
+      .order("id", { ascending: true });
+    if (error) {
+      alert("Could not load payments: " + error.message);
+      return;
+    }
+    state.payments = data;
+    render();
+  }
+
+  // ---------- Loan setup / edit ----------
+  function openSetup(isEdit) {
+    $("setupTitle").textContent = isEdit ? "Edit loan" : "Set up your loan";
+    $("setupCancel").classList.toggle("hidden", !isEdit);
+    if (isEdit && state.loan) {
+      $("loanName").value = state.loan.name;
+      $("loanTotal").value = Number(state.loan.total_amount);
+      $("loanMonthly").value = Number(state.loan.monthly_amount);
+      $("loanStart").value = state.loan.start_date;
+    }
+    setMsg($("setupMsg"), "");
+    show("setupView");
+  }
+
+  $("editLoanLink").addEventListener("click", () => openSetup(true));
+  $("setupCancel").addEventListener("click", () => show("appView"));
+
+  $("setupForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("setupBtn");
+    btn.disabled = true;
+    const row = {
+      name: $("loanName").value.trim(),
+      total_amount: Number($("loanTotal").value),
+      monthly_amount: Number($("loanMonthly").value),
+      start_date: $("loanStart").value
+    };
+    let result;
+    if (state.loan) {
+      result = await sb.from("loans").update(row).eq("id", state.loan.id).select().single();
+    } else {
+      result = await sb.from("loans").insert(row).select().single();
+    }
+    btn.disabled = false;
+    if (result.error) {
+      setMsg($("setupMsg"), "Could not save: " + result.error.message, "error");
+      return;
+    }
+    state.loan = result.data;
+    await loadPayments();
+    show("appView");
+  });
+
+  // ---------- Payments ----------
+  function resetPayForm() {
+    state.editingId = null;
+    $("formTitle").textContent = "Add payment";
+    $("payBtn").textContent = "Save payment";
+    $("payCancel").classList.add("hidden");
+    $("payDate").value = todayStr();
+    $("payAmount").value = state.loan ? Number(state.loan.monthly_amount) : "";
+    $("payNotes").value = "";
+  }
+
+  $("payCancel").addEventListener("click", () => {
+    resetPayForm();
+    setMsg($("payMsg"), "");
+  });
+
+  $("payForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("payBtn");
+    btn.disabled = true;
+    const row = {
+      paid_on: $("payDate").value,
+      amount: Number($("payAmount").value),
+      notes: $("payNotes").value.trim() || null
+    };
+    let error;
+    if (state.editingId) {
+      ({ error } = await sb.from("payments").update(row).eq("id", state.editingId));
+    } else {
+      row.loan_id = state.loan.id;
+      ({ error } = await sb.from("payments").insert(row));
+    }
+    btn.disabled = false;
+    if (error) {
+      setMsg($("payMsg"), "Could not save: " + error.message, "error");
+      return;
+    }
+    setMsg($("payMsg"), state.editingId ? "Payment updated." : "Payment saved.", "ok");
+    resetPayForm();
+    await loadPayments();
+  });
+
+  function startEdit(p) {
+    state.editingId = p.id;
+    $("formTitle").textContent = "Edit payment";
+    $("payBtn").textContent = "Update payment";
+    $("payCancel").classList.remove("hidden");
+    $("payDate").value = p.paid_on;
+    $("payAmount").value = Number(p.amount);
+    $("payNotes").value = p.notes || "";
+    setMsg($("payMsg"), "");
+    $("payForm").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function deletePayment(p) {
+    if (!confirm("Delete the payment of " + rupee(p.amount) + " on " + fmtDate(p.paid_on) + "? This cannot be undone.")) return;
+    const { error } = await sb.from("payments").delete().eq("id", p.id);
+    if (error) {
+      alert("Could not delete: " + error.message);
+      return;
+    }
+    if (state.editingId === p.id) resetPayForm();
+    await loadPayments();
+  }
+
+  $("importBtn").addEventListener("click", async () => {
+    if (!confirm("Import the 5 payments (May to Sep 2026) from the old Google Sheet?")) return;
+    const btn = $("importBtn");
+    btn.disabled = true;
+    const rows = OLD_ENTRIES.map(r => ({ ...r, loan_id: state.loan.id }));
+    const { error } = await sb.from("payments").insert(rows);
+    btn.disabled = false;
+    if (error) {
+      alert("Import failed: " + error.message);
+      return;
+    }
+    await loadPayments();
+  });
+
+  // ---------- Render ----------
+  function render() {
+    const loan = state.loan;
+    const total = Number(loan.total_amount);
+    const monthly = Number(loan.monthly_amount);
+    const payments = state.payments;
+    const paid = payments.reduce((s, p) => s + Number(p.amount), 0);
+    const remaining = Math.max(total - paid, 0);
+    const pct = total > 0 ? Math.min(paid / total * 100, 100) : 0;
+    const totalPayments = Math.ceil(total / monthly);
+    const monthsLeft = Math.ceil(remaining / monthly);
+
+    $("loanTitle").textContent = loan.name + " · started " + fmtDate(loan.start_date);
+    $("statTotal").textContent = rupee(total);
+    $("statMonthly").textContent = rupee(monthly) + " per month";
+    $("statPaid").textContent = rupee(paid);
+    $("statCount").textContent = payments.length + (payments.length === 1 ? " payment" : " payments");
+    $("statRemaining").textContent = rupee(remaining);
+    $("statMonthsLeft").textContent = remaining > 0 ? monthsLeft + " payments left (" + yearsMonths(monthsLeft) + ")" : "Fully paid";
+
+    // Expected completion: last paid month + payments left
+    if (remaining <= 0) {
+      $("statFinish").textContent = "Done";
+      $("statFinishSub").textContent = "Loan completed";
+    } else {
+      const lastIdx = payments.length
+        ? monthIndex(payments[payments.length - 1].paid_on)
+        : monthIndex(loan.start_date) - 1;
+      const finishIdx = lastIdx + monthsLeft;
+      $("statFinish").textContent = idxToLabel(finishIdx);
+      const lastAmount = remaining - (monthsLeft - 1) * monthly;
+      $("statFinishSub").textContent = lastAmount < monthly
+        ? "Last payment: " + rupee(lastAmount)
+        : "At " + rupee(monthly) + " per month";
+    }
+
+    $("progressBar").style.width = pct.toFixed(2) + "%";
+    $("progressPct").textContent = pct.toFixed(1) + "% complete";
+    $("progressPayments").textContent = payments.length + " of " + totalPayments + " payments";
+
+    // Reminder for current month
+    const now = new Date();
+    const curIdx = now.getFullYear() * 12 + now.getMonth();
+    const paidThisMonth = payments.some(p => monthIndex(p.paid_on) === curIdx);
+    const banner = $("reminder");
+    if (remaining <= 0) {
+      banner.textContent = "Congratulations! The loan is fully paid.";
+      banner.className = "banner done";
+    } else if (!paidThisMonth) {
+      banner.textContent = "No payment recorded for " + MONTHS_LONG[now.getMonth()] + " " + now.getFullYear() + " yet.";
+      banner.className = "banner";
+    } else {
+      banner.textContent = "This month's payment is recorded.";
+      banner.className = "banner done";
+    }
+
+    // History table, with running remaining balance
+    const body = $("historyBody");
+    body.innerHTML = "";
+    if (!payments.length) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 6;
+      td.className = "empty";
+      td.textContent = "No payments yet. Add your first payment above.";
+      tr.appendChild(td);
+      body.appendChild(tr);
+    }
+    let running = total;
+    payments.forEach((p, i) => {
+      running -= Number(p.amount);
+      const tr = document.createElement("tr");
+      const cells = [
+        { text: String(i + 1) },
+        { text: fmtDate(p.paid_on) },
+        { text: rupee(p.amount), cls: "num" },
+        { text: rupee(Math.max(running, 0)), cls: "num" },
+        { text: p.notes || "", cls: "notes" }
+      ];
+      cells.forEach(c => {
+        const td = document.createElement("td");
+        td.textContent = c.text;
+        if (c.cls) td.className = c.cls;
+        tr.appendChild(td);
+      });
+      const act = document.createElement("td");
+      act.className = "actions";
+      const eb = document.createElement("button");
+      eb.className = "btn-light btn-small";
+      eb.textContent = "Edit";
+      eb.onclick = () => startEdit(p);
+      const db = document.createElement("button");
+      db.className = "btn-danger btn-small";
+      db.textContent = "Delete";
+      db.onclick = () => deletePayment(p);
+      act.append(eb, db);
+      tr.appendChild(act);
+      body.appendChild(tr);
+    });
+
+    $("importBtn").classList.toggle("hidden", payments.length > 0);
+    if (!state.editingId) resetPayForm();
+  }
+
+  init();
+</script>
+</body>
+</html>
